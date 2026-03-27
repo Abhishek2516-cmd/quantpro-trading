@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>QuantPro - Professional Trading Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .signal-buy { animation: pulse 2s infinite; }
+        .signal-sell { animation: pulseRed 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); } 70% { box-shadow: 0 0 0 10px rgba(34,197,94,0); } 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); } }
+        @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 70% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
+        .toast { position: fixed; bottom: 20px; right: 20px; z-index: 1000; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+    </style>
+</head>
+<body class="bg-gray-900">
+    <!-- Navigation -->
+    <nav class="bg-gray-900/95 backdrop-blur-md fixed w-full z-50 border-b border-gray-800">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-chart-line text-blue-500 text-2xl"></i>
+                    <span class="text-white text-xl font-bold">Quant<span class="text-blue-500">Pro</span></span>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="#" onclick="showPage('dashboard')" class="text-gray-300 hover:text-white">Dashboard</a>
+                    <a href="#" onclick="showPage('trading')" class="text-gray-300 hover:text-white">Trading</a>
+                    <a href="#" onclick="showPage('portfolio')" class="text-gray-300 hover:text-white">Portfolio</a>
+                    <a href="#" onclick="showPage('history')" class="text-gray-300 hover:text-white">History</a>
+                    <a href="#" onclick="showPage('subscription')" class="text-gray-300 hover:text-white">Subscribe</a>
+                </div>
+                <div class="flex space-x-3">
+                    <span id="userStatus" class="text-gray-300 text-sm hidden md:block"></span>
+                    <button onclick="showLogin()" id="loginBtn" class="text-gray-300 hover:text-white px-4 py-2">Login</button>
+                    <button onclick="logout()" id="logoutBtn" class="hidden bg-red-600 text-white px-4 py-2 rounded-lg">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="pt-20 pb-8">
+        <!-- Dashboard Page -->
+        <div id="dashboardPage" class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-gray-800 rounded-2xl p-6 card-hover">
+                    <p class="text-gray-400">Total P&L</p>
+                    <p class="text-white text-2xl font-bold" id="totalPnL">$0.00</p>
+                </div>
+                <div class="bg-gray-800 rounded-2xl p-6 card-hover">
+                    <p class="text-gray-400">Win Rate</p>
+                    <p class="text-white text-2xl font-bold" id="winRate">0%</p>
+                </div>
+                <div class="bg-gray-800 rounded-2xl p-6 card-hover">
+                    <p class="text-gray-400">Open Positions</p>
+                    <p class="text-white text-2xl font-bold" id="openPositions">0</p>
+                </div>
+                <div class="bg-gray-800 rounded-2xl p-6 card-hover">
+                    <p class="text-gray-400">Total Trades</p>
+                    <p class="text-white text-2xl font-bold" id="totalTrades">0</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-gray-800 rounded-2xl p-6">
+                    <h3 class="text-white mb-4">P&L History</h3>
+                    <canvas id="pnlChart" height="300"></canvas>
+                </div>
+                <div class="bg-gray-800 rounded-2xl p-6">
+                    <h3 class="text-white mb-4">Performance Stats</h3>
+                    <div id="performanceStats" class="text-gray-300 space-y-3">
+                        <div class="flex justify-between"><span>Best Trade:</span><span id="bestTrade" class="text-green-500">$0</span></div>
+                        <div class="flex justify-between"><span>Worst Trade:</span><span id="worstTrade" class="text-red-500">$0</span></div>
+                        <div class="flex justify-between"><span>Average P&L:</span><span id="avgPnL">$0</span></div>
+                        <div class="flex justify-between"><span>Profit Factor:</span><span id="profitFactor">0</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trading Page with Chart & Indicators -->
+        <div id="tradingPage" class="hidden container mx-auto px-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Chart Section -->
+                <div class="lg:col-span-2">
+                    <div class="bg-gray-800 rounded-2xl p-4">
+                        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                            <div>
+                                <select id="symbolSelect" class="bg-gray-700 text-white px-4 py-2 rounded-lg">
+                                    <option value="BTCUSD">BTC/USD</option>
+                                    <option value="ETHUSD">ETH/USD</option>
+                                    <option value="AAPL">AAPL</option>
+                                    <option value="GOOGL">GOOGL</option>
+                                    <option value="TSLA">TSLA</option>
+                                </select>
+                                <select id="timeframeSelect" class="bg-gray-700 text-white px-4 py-2 rounded-lg ml-2">
+                                    <option value="1m">1 Min</option>
+                                    <option value="5m">5 Min</option>
+                                    <option value="15m">15 Min</option>
+                                    <option value="1h">1 Hour</option>
+                                    <option value="1d">1 Day</option>
+                                </select>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="addIndicator('MA')" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">MA</button>
+                                <button onclick="addIndicator('RSI')" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">RSI</button>
+                                <button onclick="addIndicator('MACD')" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">MACD</button>
+                                <button onclick="clearIndicators()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">Clear</button>
+                            </div>
+                        </div>
+                        <canvas id="tradingChart" height="400"></canvas>
+                        <div id="indicatorPanel" class="mt-4 grid grid-cols-3 gap-4"></div>
+                    </div>
+                </div>
+                
+                <!-- Live Signal & Order Form -->
+                <div>
+                    <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 mb-6">
+                        <h2 class="text-white text-xl mb-4">🔥 Live Signal</h2>
+                        <div id="liveSignal" class="bg-gray-700/50 rounded-xl p-6 text-center">
+                            <div id="signalType" class="text-4xl font-bold text-green-500 mb-3">BUY</div>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div><p class="text-gray-400 text-sm">Entry</p><p id="signalEntry" class="text-white text-xl font-bold">0</p></div>
+                                <div><p class="text-gray-400 text-sm">SL</p><p id="signalSL" class="text-red-500 text-xl font-bold">0</p></div>
+                                <div><p class="text-gray-400 text-sm">TP</p><p id="signalTP" class="text-green-500 text-xl font-bold">0</p></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-2xl p-6">
+                        <h2 class="text-white text-xl mb-4">Place Order</h2>
+                        <form id="orderForm">
+                            <select id="orderType" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3">
+                                <option value="BUY">BUY</option>
+                                <option value="SELL">SELL</option>
+                            </select>
+                            <input type="number" id="entryPrice" placeholder="Entry Price" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3">
+                            <input type="number" id="stopLoss" placeholder="Stop Loss" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3">
+                            <input type="number" id="takeProfit" placeholder="Take Profit" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3">
+                            <input type="number" id="quantity" placeholder="Quantity" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3">
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold">Place Order</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Portfolio Page -->
+        <div id="portfolioPage" class="hidden container mx-auto px-4">
+            <div class="bg-gray-800 rounded-2xl p-6">
+                <h2 class="text-white text-xl mb-4">My Portfolio</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-white">
+                        <thead>
+                            <tr class="border-b border-gray-700">
+                                <th class="py-3 text-left">Symbol</th><th>Type</th><th>Entry</th><th>Current</th><th>Qty</th><th>P&L</th><th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="portfolioTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trade History Page -->
+        <div id="historyPage" class="hidden container mx-auto px-4">
+            <div class="bg-gray-800 rounded-2xl p-6">
+                <h2 class="text-white text-xl mb-4">Trade History</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-white">
+                        <thead>
+                            <tr class="border-b border-gray-700">
+                                <th class="py-3 text-left">Date</th><th>Symbol</th><th>Type</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscription Page with UPI -->
+        <div id="subscriptionPage" class="hidden container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-gray-800 rounded-2xl p-6 text-center card-hover">
+                    <h3 class="text-white text-2xl mb-2">Basic</h3>
+                    <p class="text-3xl font-bold text-white">$29<span class="text-gray-400 text-sm">/month</span></p>
+                    <ul class="mt-4 text-gray-300 space-y-2">
+                        <li>✓ 5 Trades/Day</li>
+                        <li>✓ Basic Indicators</li>
+                        <li>✓ Email Support</li>
+                    </ul>
+                    <button onclick="startSubscription(29, 'Basic')" class="mt-6 w-full bg-blue-600 text-white py-2 rounded-lg">Subscribe</button>
+                </div>
+                <div class="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl p-6 text-center transform scale-105">
+                    <h3 class="text-white text-2xl mb-2">Pro</h3>
+                    <p class="text-3xl font-bold text-white">$99<span class="text-white/70 text-sm">/month</span></p>
+                    <ul class="mt-4 text-white space-y-2">
+                        <li>✓ Unlimited Trades</li>
+                        <li>✓ All Indicators</li>
+                        <li>✓ Real-time Signals</li>
+                        <li>✓ Priority Support</li>
+                    </ul>
+                    <button onclick="startSubscription(99, 'Pro')" class="mt-6 w-full bg-white text-blue-600 py-2 rounded-lg font-semibold">Subscribe</button>
+                </div>
+                <div class="bg-gray-800 rounded-2xl p-6 text-center card-hover">
+                    <h3 class="text-white text-2xl mb-2">Enterprise</h3>
+                    <p class="text-3xl font-bold text-white">$299<span class="text-gray-400 text-sm">/month</span></p>
+                    <ul class="mt-4 text-gray-300 space-y-2">
+                        <li>✓ API Access</li>
+                        <li>✓ Custom Indicators</li>
+                        <li>✓ Dedicated Support</li>
+                        <li>✓ Premium Signals</li>
+                    </ul>
+                    <button onclick="startSubscription(299, 'Enterprise')" class="mt-6 w-full bg-blue-600 text-white py-2 rounded-lg">Subscribe</button>
+                </div>
+            </div>
+            <div class="mt-8 bg-gray-800 rounded-2xl p-6 text-center">
+                <h3 class="text-white text-xl mb-4">UPI Payment</h3>
+                <div class="flex flex-col items-center">
+                    <img id="upiQR" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=quantpro@okhdfcbank&pn=QuantPro&am=99&cu=INR" alt="UPI QR" class="w-48 h-48">
+                    <p class="text-gray-300 mt-4">UPI ID: <span class="text-blue-500 font-mono">quantpro@okhdfcbank</span></p>
+                    <button onclick="copyUPI()" class="mt-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">Copy UPI ID</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4">
+            <h2 class="text-white text-2xl mb-6">Login to QuantPro</h2>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" placeholder="Email Address" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3" required>
+                <input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-4" required>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold">Login</button>
+            </form>
+            <p class="text-gray-400 text-center mt-4">Don't have an account? <button onclick="showSignup()" class="text-blue-500">Sign Up</button></p>
+        </div>
+    </div>
+    
+    <!-- Signup Modal -->
+    <div id="signupModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4">
+            <h2 class="text-white text-2xl mb-6">Create Account</h2>
+            <form id="signupForm">
+                <input type="text" id="signupName" placeholder="Full Name" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3" required>
+                <input type="email" id="signupEmail" placeholder="Email Address" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3" required>
+                <input type="password" id="signupPassword" placeholder="Password" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-4" required>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold">CREATE ACCOUNT</button>
+            </form>
+            <p class="text-gray-400 text-center mt-4">Already have an account? <button onclick="showLogin()" class="text-blue-500">Login</button></p>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let socket = null;
+        let mainChart = null;
+        let chartData = [];
+        let activeIndicators = [];
+        let realTimeInterval;
+        
+        // Initialize WebSocket (will connect after backend deploy)
+        function initWebSocket() {
+            // Backend URL - isko apne render URL se replace karna
+            const BACKEND_URL = 'https://quantpro-backend.onrender.com';
+            try {
+                socket = io(BACKEND_URL, { transports: ['websocket'], autoConnect: true });
+                socket.on('connect', () => showToast('Connected to real-time server', 'success'));
+                socket.on('priceUpdate', (data) => updateRealTimePrice(data));
+                socket.on('newSignal', (signal) => updateLiveSignal(signal));
+                socket.on('disconnect', () => console.log('Disconnected'));
+            } catch(e) { console.log('WebSocket not connected yet'); }
+        }
+        
+        // Real-time price simulation (fallback)
+        function startRealTimePrices() {
+            realTimeInterval = setInterval(() => {
+                const symbols = ['BTCUSD', 'ETHUSD', 'AAPL', 'GOOGL', 'TSLA'];
+                const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+                const basePrice = randomSymbol === 'BTCUSD' ? 43500 : randomSymbol === 'ETHUSD' ? 3200 : randomSymbol === 'AAPL' ? 175 : randomSymbol === 'GOOGL' ? 140 : 240;
+                const price = basePrice + (Math.random() - 0.5) * basePrice * 0.02;
+                updateChart(price);
+            }, 3000);
+            
+            // Generate signals
+            setInterval(() => {
+                const type = Math.random() > 0.5 ? 'BUY' : 'SELL';
+                const basePrice = 2350;
+                updateLiveSignal({ type, entry: basePrice, sl: type === 'BUY' ? basePrice - 5 : basePrice + 5, tp: type === 'BUY' ? basePrice + 10 : basePrice - 10 });
+            }, 30000);
+        }
+        
+        // Trading Chart with Indicators
+        function initTradingChart() {
+            const ctx = document.getElementById('tradingChart').getContext('2d');
+            chartData = generateMockCandleData(100);
+            mainChart = new Chart(ctx, {
+                type: 'candlestick',
+                data: { datasets: [{ label: 'Price', data: chartData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)' }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white' } } } }
+            });
+        }
+        
+        function generateMockCandleData(count) {
+            let data = [], price = 43500;
+            for (let i = 0; i < count; i++) {
+                let open = price, close = price + (Math.random() - 0.5) * 200;
+                data.push({ x: new Date(Date.now() - (count - i) * 60000), o: open, h: Math.max(open, close) + Math.random() * 100, l: Math.min(open, close) - Math.random() * 100, c: close });
+                price = close;
+            }
+            return data;
+        }
+        
+        function updateChart(newPrice) {
+            if (!mainChart) return;
+            let lastCandle = chartData[chartData.length - 1];
+            if (lastCandle && new Date() - lastCandle.x < 60000) {
+                lastCandle.c = newPrice;
+                lastCandle.h = Math.max(lastCandle.h, newPrice);
+                lastCandle.l = Math.min(lastCandle.l, newPrice);
+            } else {
+                chartData.push({ x: new Date(), o: lastCandle?.c || newPrice, h: newPrice, l: newPrice, c: newPrice });
+                if (chartData.length > 100) chartData.shift();
+            }
+            mainChart.update();
+            updateIndicators();
+        }
+        
+        // Technical Indicators
+        function addIndicator(type) {
+            if (activeIndicators.includes(type)) return;
+            activeIndicators.push(type);
+            updateIndicators();
+            showToast(`${type} indicator added`, 'success');
+        }
+        
+        function clearIndicators() { activeIndicators = []; updateIndicators(); showToast('All indicators cleared', 'info'); }
+        
+        function updateIndicators() {
+            const prices = chartData.map(c => c.c);
+            const panel = document.getElementById('indicatorPanel');
+            panel.innerHTML = '';
+            
+            if (activeIndicators.includes('MA') && prices.length >= 20) {
+                const ma20 = calculateMA(prices, 20);
+                panel.innerHTML += `<div class="bg-gray-700 p-3 rounded"><p class="text-blue-500">MA(20)</p><p class="text-white text-xl">${ma20[ma20.length-1]?.toFixed(2) || 'N/A'}</p></div>`;
+            }
+            if (activeIndicators.includes('RSI') && prices.length >= 14) {
+                const rsi = calculateRSI(prices, 14);
+                const rsiValue = rsi[rsi.length-1]?.toFixed(2) || 'N/A';
+                const rsiColor = rsiValue > 70 ? 'text-red-500' : rsiValue < 30 ? 'text-green-500' : 'text-yellow-500';
+                panel.innerHTML += `<div class="bg-gray-700 p-3 rounded"><p class="text-green-500">RSI(14)</p><p class="${rsiColor} text-xl">${rsiValue}</p></div>`;
+            }
+            if (activeIndicators.includes('MACD') && prices.length >= 26) {
+                const macd = calculateMACD(prices);
+                panel.innerHTML += `<div class="bg-gray-700 p-3 rounded"><p class="text-purple-500">MACD</p><p class="text-white text-xl">${macd.histogram[macd.histogram.length-1]?.toFixed(2) || 'N/A'}</p></div>`;
+            }
+        }
+        
+        function calculateMA(data, period) { let result = []; for (let i = period-1; i < data.length; i++) { let sum = 0; for (let j = 0; j < period; j++) sum += data[i-j]; result.push(sum/period); } return result; }
+        function calculateRSI(data, period) { let gains = 0, losses = 0, rsi = []; for (let i = 1; i < data.length; i++) { let change = data[i] - data[i-1]; if (change >= 0) gains += change; else losses -= change; if (i >= period) { let avgGain = gains/period, avgLoss = losses/period; rsi.push(100 - (100 / (1 + avgGain/avgLoss))); } } return rsi; }
+        function calculateMACD(data) { let ema12 = [], ema26 = [], macd = [], signal = [], histogram = []; for (let i = 0; i < data.length; i++) { ema12.push(data[i]); ema26.push(data[i]); if (i >= 26) { macd.push(ema12[i] - ema26[i]); if (i >= 34) { let sig = macd.slice(-9).reduce((a,b)=>a+b,0)/9; signal.push(sig); histogram.push(macd[i] - sig); } } } return { macd, signal, histogram }; }
+        
+        // Live Signal
+        function updateLiveSignal(signal) {
+            const signalDiv = document.getElementById('liveSignal');
+            const signalType = document.getElementById('signalType');
+            signalType.textContent = signal.type;
+            signalType.className = `text-4xl font-bold mb-3 ${signal.type === 'BUY' ? 'text-green-500' : 'text-red-500'}`;
+            signalDiv.className = `bg-gray-700/50 rounded-xl p-6 text-center ${signal.type === 'BUY' ? 'signal-buy' : 'signal-sell'}`;
+            document.getElementById('signalEntry').textContent = signal.entry?.toFixed(2) || signal.entry;
+            document.getElementById('signalSL').textContent = signal.sl?.toFixed(2) || signal.sl;
+            document.getElementById('signalTP').textContent = signal.tp?.toFixed(2) || signal.tp;
+        }
+        
+        function updateRealTimePrice(data) { }
+        
+        // Order Management
+        document.getElementById('orderForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) { showToast('Please login first', 'error'); showLogin(); return; }
+            const order = { 
+                userId: currentUser.email, 
+                type: document.getElementById('orderType').value, 
+                entry: parseFloat(document.getElementById('entryPrice').value), 
+                sl: parseFloat(document.getElementById('stopLoss').value), 
+                tp: parseFloat(document.getElementById('takeProfit').value), 
+                quantity: parseFloat(document.getElementById('quantity').value), 
+                symbol: document.getElementById('symbolSelect')?.value || 'BTCUSD', 
+                timestamp: new Date().toISOString() 
+            };
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            orders.push(order);
+            localStorage.setItem('orders', JSON.stringify(orders));
+            updatePortfolio();
+            updateHistory();
+            updateDashboard();
+            showToast('Order placed successfully!', 'success');
+            e.target.reset();
+        });
+        
+        function updatePortfolio() {
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            let portfolio = orders.filter(o => !o.exitTime);
+            let tableBody = document.getElementById('portfolioTable');
+            if (tableBody) { 
+                tableBody.innerHTML = ''; 
+                portfolio.slice(-10).forEach(order => { 
+                    let row = tableBody.insertRow(); 
+                    row.innerHTML = `<td class="py-2">${order.symbol}</td><td class="${order.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${order.type}</td><td>$${order.entry}</td><td>$${order.entry}</td><td>${order.quantity}</td><td class="text-yellow-500">$0</td><td><button onclick="closePosition('${order.timestamp}')" class="bg-red-600 px-3 py-1 rounded text-sm">Close</button></td>`; 
+                }); 
+            }
+            document.getElementById('openPositions').innerText = portfolio.length;
+        }
+        
+        function updateHistory() {
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            let closed = orders.filter(o => o.exitTime);
+            let tableBody = document.getElementById('historyTable');
+            if (tableBody) { 
+                tableBody.innerHTML = ''; 
+                closed.slice(-20).reverse().forEach(order => { 
+                    let pnl = order.exitPrice ? ((order.type === 'BUY' ? order.exitPrice - order.entry : order.entry - order.exitPrice) * order.quantity).toFixed(2) : 0; 
+                    let row = tableBody.insertRow(); 
+                    row.innerHTML = `<td class="py-2">${new Date(order.exitTime || order.timestamp).toLocaleString()}</td><td>${order.symbol}</td><td class="${order.type === 'BUY' ? 'text-green-500' : 'text-red-500'}">${order.type}</td><td>$${order.entry}</td><td>$${order.exitPrice || '-'}</td><td class="${pnl >= 0 ? 'text-green-500' : 'text-red-500'}">$${pnl}</td><td>Closed</td>`; 
+                }); 
+            }
+            updateDashboard();
+        }
+        
+        function updateDashboard() {
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            let closedTrades = orders.filter(o => o.exitPrice);
+            let totalPnL = closedTrades.reduce((sum, o) => sum + ((o.type === 'BUY' ? o.exitPrice - o.entry : o.entry - o.exitPrice) * o.quantity), 0);
+            let winning = closedTrades.filter(o => (o.type === 'BUY' ? o.exitPrice > o.entry : o.exitPrice < o.entry)).length;
+            let winRate = closedTrades.length ? ((winning/closedTrades.length)*100) : 0;
+            let pnls = closedTrades.map(o => (o.type === 'BUY' ? o.exitPrice - o.entry : o.entry - o.exitPrice) * o.quantity);
+            let bestTrade = Math.max(...pnls, 0);
+            let worstTrade = Math.min(...pnls, 0);
+            let avgPnL = pnls.length ? pnls.reduce((a,b)=>a+b,0)/pnls.length : 0;
+            let totalProfit = pnls.filter(p=>p>0).reduce((a,b)=>a+b,0);
+            let totalLoss = Math.abs(pnls.filter(p=>p<0).reduce((a,b)=>a+b,0));
+            let profitFactor = totalLoss ? (totalProfit/totalLoss).toFixed(2) : totalProfit ? '∞' : 0;
+            
+            document.getElementById('totalPnL').innerText = `$${totalPnL.toFixed(2)}`;
+            document.getElementById('winRate').innerText = winRate.toFixed(1) + '%';
+            document.getElementById('totalTrades').innerText = orders.length;
+            document.getElementById('bestTrade').innerText = `$${bestTrade.toFixed(2)}`;
+            document.getElementById('worstTrade').innerText = `$${worstTrade.toFixed(2)}`;
+            document.getElementById('avgPnL').innerText = `$${avgPnL.toFixed(2)}`;
+            document.getElementById('profitFactor').innerText = profitFactor;
+        }
+        
+        function closePosition(timestamp) {
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            let order = orders.find(o => o.timestamp === timestamp);
+            if (order) { 
+                order.exitTime = new Date().toISOString(); 
+                order.exitPrice = order.entry + (Math.random() - 0.5) * (order.type === 'BUY' ? 20 : -20);
+                localStorage.setItem('orders', JSON.stringify(orders)); 
+                updatePortfolio(); 
+                updateHistory(); 
+                showToast('Position closed', 'success'); 
+            }
+        }
+        
+        // UPI Payment
+        function startSubscription(amount, plan) {
+            if (!currentUser) { showToast('Please login first', 'error'); showLogin(); return; }
+            showToast(`Proceed to pay ₹${amount} for ${plan} plan via UPI`, 'info');
+            const upiLink = `upi://pay?pa=quantpro@okhdfcbank&pn=QuantPro&am=${amount}&tn=${plan} Subscription&cu=INR`;
+            window.location.href = upiLink;
+        }
+        
+        function copyUPI() { 
+            navigator.clipboard.writeText('quantpro@okhdfcbank'); 
+            showToast('UPI ID copied! Open any UPI app to pay', 'success'); 
+        }
+        
+        // Auth Functions
+        function showLogin() { document.getElementById('loginModal').classList.remove('hidden'); }
+        function hideLogin() { document.getElementById('loginModal').classList.add('hidden'); }
+        function showSignup() { hideLogin(); document.getElementById('signupModal').classList.remove('hidden'); }
+        function hideSignup() { document.getElementById('signupModal').classList.add('hidden'); }
+        
+        document.getElementById('loginForm')?.addEventListener('submit', (e) => { 
+            e.preventDefault(); 
+            currentUser = { email: document.getElementById('loginEmail').value }; 
+            localStorage.setItem('user', JSON.stringify(currentUser)); 
+            hideLogin(); 
+            updateAuthUI(); 
+            showToast('Login successful!', 'success'); 
+            showPage('trading'); 
+        });
+        
+        document.getElementById('signupForm')?.addEventListener('submit', (e) => { 
+            e.preventDefault(); 
+            currentUser = { email: document.getElementById('signupEmail').value, name: document.getElementById('signupName').value }; 
+            localStorage.setItem('user', JSON.stringify(currentUser)); 
+            hideSignup(); 
+            updateAuthUI(); 
+            showToast('Account created!', 'success'); 
+            showPage('trading'); 
+        });
+        
+        function logout() { currentUser = null; localStorage.removeItem('user'); updateAuthUI(); showToast('Logged out', 'info'); showPage('dashboard'); }
+        function updateAuthUI() { 
+            document.getElementById('userStatus').innerText = currentUser ? currentUser.email : ''; 
+            document.getElementById('loginBtn').classList.toggle('hidden', !!currentUser); 
+            document.getElementById('logoutBtn').classList.toggle('hidden', !currentUser); 
+        }
+        
+        function showPage(page) { 
+            ['dashboard', 'trading', 'portfolio', 'history', 'subscription'].forEach(p => document.getElementById(p + 'Page').classList.add('hidden')); 
+            document.getElementById(page + 'Page').classList.remove('hidden'); 
+            if(page === 'trading') { if(!mainChart) initTradingChart(); } 
+            updatePortfolio(); 
+            updateHistory(); 
+        }
+        
+        function showToast(msg, type) { 
+            let toast = document.createElement('div'); 
+            toast.className = `toast ${type === 'error' ? 'bg-red-600' : type === 'success' ? 'bg-green-600' : 'bg-blue-600'} text-white px-6 py-3 rounded-lg shadow-lg`; 
+            toast.innerHTML = msg; 
+            document.body.appendChild(toast); 
+            setTimeout(() => toast.remove(), 3000); 
+        }
+        
+        // Initialize
+        let savedUser = localStorage.getItem('user'); 
+        if (savedUser) { currentUser = JSON.parse(savedUser); updateAuthUI(); }
+        startRealTimePrices();
+        showPage('dashboard');
+        initTradingChart();
+    </script>
+</body>
+                                                                                       </html>
