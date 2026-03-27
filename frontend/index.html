@@ -1,119 +1,495 @@
-<!-- Trading Page - TradingView Style -->
-<div id="tradingPage" class="hidden container mx-auto px-4">
-    <!-- Price Header -->
-    <div class="bg-gray-800 rounded-2xl p-4 mb-4">
-        <div class="flex justify-between items-center flex-wrap">
-            <div>
-                <h1 class="text-2xl font-bold text-white" id="currentSymbol">Gold Futures</h1>
-                <p class="text-gray-400 text-sm">COMEX · GC1! · <span id="timeframeDisplay">15m</span></p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>QuantPro - Professional Trading Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .signal-buy { animation: pulse 2s infinite; }
+        .signal-sell { animation: pulseRed 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); } 70% { box-shadow: 0 0 0 10px rgba(34,197,94,0); } 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); } }
+        @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 70% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
+        .toast { position: fixed; bottom: 20px; right: 20px; z-index: 1000; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .card-hover { transition: transform 0.3s ease; }
+        .card-hover:hover { transform: translateY(-5px); }
+        .timeframe-btn.active { background-color: #3b82f6; color: white; }
+    </style>
+</head>
+<body class="bg-gray-900">
+    <!-- Navigation -->
+    <nav class="bg-gray-900/95 backdrop-blur-md fixed w-full z-50 border-b border-gray-800">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-chart-line text-blue-500 text-2xl"></i>
+                    <span class="text-white text-xl font-bold">Quant<span class="text-blue-500">Pro</span></span>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="#" onclick="showPage('dashboard')" class="text-gray-300 hover:text-white">Dashboard</a>
+                    <a href="#" onclick="showPage('trading')" class="text-gray-300 hover:text-white">Trading</a>
+                    <a href="#" onclick="showPage('portfolio')" class="text-gray-300 hover:text-white">Portfolio</a>
+                    <a href="#" onclick="showPage('history')" class="text-gray-300 hover:text-white">History</a>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="showLogin()" id="loginBtn" class="text-gray-300 hover:text-white px-4 py-2">Login</button>
+                    <button onclick="logout()" id="logoutBtn" class="hidden bg-red-600 text-white px-4 py-2 rounded-lg">Logout</button>
+                </div>
             </div>
-            <div class="text-right">
-                <div class="flex items-center space-x-4">
+        </div>
+    </nav>
+
+    <div class="pt-20 pb-8">
+        <!-- Dashboard Page -->
+        <div id="dashboardPage" class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-gray-800 rounded-2xl p-6 card-hover">
+                    <p class="text-gray-400">Total P&L</p>
+                    <p class="text-white text-2xl font-bold" id="totalPnL">$0.00</p>
+                </div>
+                <div class="bg-gray-800 rounded-2xl p-6 card-hover">
+                    <p class="text-gray-400">Win Rate</p>
+                    <p class="text-white text-2xl font-bold" id="winRate">0%</p>
+                </div>
+                <div class="bg-gray-800 rounded-2xl p-6 card-hover">
+                    <p class="text-gray-400">Open Positions</p>
+                    <p class="text-white text-2xl font-bold" id="openPositions">0</p>
+                </div>
+                <div class="bg-gray-800 rounded-2xl p-6 card-hover">
+                    <p class="text-gray-400">Total Trades</p>
+                    <p class="text-white text-2xl font-bold" id="totalTrades">0</p>
+                </div>
+            </div>
+            <div class="bg-gray-800 rounded-2xl p-6">
+                <canvas id="pnlChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Trading Page - TradingView Style -->
+        <div id="tradingPage" class="hidden container mx-auto px-4">
+            <!-- Price Header -->
+            <div class="bg-gray-800 rounded-2xl p-4 mb-4">
+                <div class="flex justify-between items-center flex-wrap">
                     <div>
-                        <p class="text-gray-400 text-xs">Bid</p>
-                        <p class="text-2xl font-bold text-green-500" id="bidPrice">4,540.7</p>
+                        <h1 class="text-2xl font-bold text-white" id="currentSymbol">Gold Futures</h1>
+                        <p class="text-gray-400 text-sm">COMEX · GC1! · <span id="timeframeDisplay">15m</span></p>
                     </div>
-                    <div>
-                        <p class="text-gray-400 text-xs">Ask</p>
-                        <p class="text-2xl font-bold text-red-500" id="askPrice">4,541.2</p>
+                    <div class="text-right">
+                        <div class="flex items-center space-x-4">
+                            <div>
+                                <p class="text-gray-400 text-xs">Bid</p>
+                                <p class="text-2xl font-bold text-green-500" id="bidPrice">4,540.7</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-xs">Ask</p>
+                                <p class="text-2xl font-bold text-red-500" id="askPrice">4,541.2</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-xs">Change</p>
+                                <p class="text-lg font-semibold text-red-500" id="changePercent">-0.00%</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <p class="text-gray-400 text-xs">Change</p>
-                        <p class="text-lg font-semibold text-red-500" id="changePercent">-0.00%</p>
+                </div>
+                <div class="flex space-x-4 mt-4">
+                    <button onclick="quickSell()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold text-lg transition">SELL</button>
+                    <button onclick="quickBuy()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold text-lg transition">BUY</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <!-- Chart Section -->
+                <div class="lg:col-span-3">
+                    <div class="bg-gray-800 rounded-2xl p-4">
+                        <div class="flex space-x-2 mb-4 border-b border-gray-700 pb-2 flex-wrap">
+                            <button onclick="setTimeframe('1m')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">1m</button>
+                            <button onclick="setTimeframe('5m')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">5m</button>
+                            <button onclick="setTimeframe('15m')" class="timeframe-btn active px-3 py-1 rounded text-sm bg-blue-600 text-white">15m</button>
+                            <button onclick="setTimeframe('1h')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">1h</button>
+                            <button onclick="setTimeframe('4h')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">4h</button>
+                            <button onclick="setTimeframe('1d')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">1d</button>
+                            <div class="flex-1"></div>
+                            <div class="flex space-x-1">
+                                <button onclick="addIndicator('MA')" class="bg-gray-700 px-2 py-1 rounded text-xs">MA</button>
+                                <button onclick="addIndicator('RSI')" class="bg-gray-700 px-2 py-1 rounded text-xs">RSI</button>
+                                <button onclick="addIndicator('MACD')" class="bg-gray-700 px-2 py-1 rounded text-xs">MACD</button>
+                            </div>
+                        </div>
+                        <canvas id="tradingChart" height="400"></canvas>
+                        <div id="indicatorPanel" class="mt-4 grid grid-cols-3 gap-2 text-center text-xs"></div>
+                    </div>
+                </div>
+                
+                <!-- Order Panel -->
+                <div>
+                    <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-4 mb-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-white text-sm font-semibold">🔥 Live Signal</h3>
+                            <span class="text-green-500 text-xs animate-pulse">● LIVE</span>
+                        </div>
+                        <div id="liveSignal" class="text-center">
+                            <div id="signalType" class="text-3xl font-bold text-green-500">BUY</div>
+                            <div class="grid grid-cols-3 gap-2 mt-3">
+                                <div><p class="text-gray-500 text-xs">Entry</p><p id="signalEntry" class="text-white font-bold">2350</p></div>
+                                <div><p class="text-gray-500 text-xs">SL</p><p id="signalSL" class="text-red-400">2345</p></div>
+                                <div><p class="text-gray-500 text-xs">TP</p><p id="signalTP" class="text-green-400">2360</p></div>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">Confidence: <span id="signalConfidence">85</span>%</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-2xl p-4">
+                        <h3 class="text-white text-sm font-semibold mb-3">Place Order</h3>
+                        <form id="orderForm">
+                            <div class="flex space-x-2 mb-3">
+                                <button type="button" onclick="setOrderType('BUY')" id="buyTypeBtn" class="flex-1 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white">BUY</button>
+                                <button type="button" onclick="setOrderType('SELL')" id="sellTypeBtn" class="flex-1 py-2 rounded-lg text-sm font-semibold bg-gray-700 text-gray-400">SELL</button>
+                            </div>
+                            <input type="hidden" id="orderType" value="BUY">
+                            <input type="number" id="entryPrice" placeholder="Entry Price" class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm mb-2" value="4540.7">
+                            <input type="number" id="stopLoss" placeholder="Stop Loss" class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm mb-2" value="4535.0">
+                            <input type="number" id="takeProfit" placeholder="Take Profit" class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm mb-2" value="4550.0">
+                            <input type="number" id="quantity" placeholder="Quantity" class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm mb-3" value="1">
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-semibold">PLACE ORDER</button>
+                        </form>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-2xl p-4 mt-4">
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div><p class="text-gray-500">24h High</p><p class="text-white">4,549.0</p></div>
+                            <div><p class="text-gray-500">24h Low</p><p class="text-white">4,535.0</p></div>
+                            <div><p class="text-gray-500">Volume</p><p class="text-white">1.2M</p></div>
+                            <div><p class="text-gray-500">Open Interest</p><p class="text-white">85.3K</p></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <!-- Price Action Buttons -->
-        <div class="flex space-x-4 mt-4">
-            <button onclick="quickSell()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold text-lg transition">
-                SELL
-            </button>
-            <button onclick="quickBuy()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold text-lg transition">
-                BUY
-            </button>
+
+        <!-- Portfolio Page -->
+        <div id="portfolioPage" class="hidden container mx-auto px-4">
+            <div class="bg-gray-800 rounded-2xl p-6">
+                <h2 class="text-white text-xl mb-4">My Portfolio</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-white">
+                        <thead><tr class="border-b border-gray-700"><th class="py-3">Symbol</th><th>Type</th><th>Entry</th><th>Qty</th><th>P&L</th><th>Action</th> </tr></thead>
+                        <tbody id="portfolioTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Page -->
+        <div id="historyPage" class="hidden container mx-auto px-4">
+            <div class="bg-gray-800 rounded-2xl p-6">
+                <h2 class="text-white text-xl mb-4">Trade History</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-white">
+                        <thead><tr class="border-b border-gray-700"><th>Date</th><th>Symbol</th><th>Type</th><th>Entry</th><th>Exit</th><th>P&L</th> </tr></thead>
+                        <tbody id="historyTable"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Chart & Order Section -->
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <!-- Chart Section (3/4 width) -->
-        <div class="lg:col-span-3">
-            <div class="bg-gray-800 rounded-2xl p-4">
-                <!-- Timeframe Selector -->
-                <div class="flex space-x-2 mb-4 border-b border-gray-700 pb-2">
-                    <button onclick="setTimeframe('1m')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">1m</button>
-                    <button onclick="setTimeframe('5m')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">5m</button>
-                    <button onclick="setTimeframe('15m')" class="timeframe-btn active px-3 py-1 rounded text-sm bg-blue-600 text-white">15m</button>
-                    <button onclick="setTimeframe('1h')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">1h</button>
-                    <button onclick="setTimeframe('4h')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">4h</button>
-                    <button onclick="setTimeframe('1d')" class="timeframe-btn px-3 py-1 rounded text-sm text-gray-400 hover:text-white">1d</button>
-                    <div class="flex-1"></div>
-                    <div class="flex space-x-1">
-                        <button onclick="addIndicator('MA')" class="bg-gray-700 px-2 py-1 rounded text-xs">MA</button>
-                        <button onclick="addIndicator('EMA')" class="bg-gray-700 px-2 py-1 rounded text-xs">EMA</button>
-                        <button onclick="addIndicator('BB')" class="bg-gray-700 px-2 py-1 rounded text-xs">BB</button>
-                        <button onclick="addIndicator('RSI')" class="bg-gray-700 px-2 py-1 rounded text-xs">RSI</button>
-                        <button onclick="addIndicator('MACD')" class="bg-gray-700 px-2 py-1 rounded text-xs">MACD</button>
-                    </div>
-                </div>
-                
-                <!-- Chart Canvas -->
-                <canvas id="tradingChart" height="400"></canvas>
-                
-                <!-- Indicator Values Panel -->
-                <div id="indicatorPanel" class="mt-4 grid grid-cols-5 gap-2 text-center text-xs"></div>
-            </div>
-        </div>
-        
-        <!-- Order Panel (1/4 width) -->
-        <div>
-            <!-- Live Signal -->
-            <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-4 mb-4">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="text-white text-sm font-semibold">🔥 Live Signal</h3>
-                    <span class="text-green-500 text-xs animate-pulse">● LIVE</span>
-                </div>
-                <div id="liveSignal" class="text-center">
-                    <div id="signalType" class="text-3xl font-bold text-green-500">BUY</div>
-                    <div class="grid grid-cols-3 gap-2 mt-3">
-                        <div><p class="text-gray-500 text-xs">Entry</p><p id="signalEntry" class="text-white font-bold">2350</p></div>
-                        <div><p class="text-gray-500 text-xs">SL</p><p id="signalSL" class="text-red-400">2345</p></div>
-                        <div><p class="text-gray-500 text-xs">TP</p><p id="signalTP" class="text-green-400">2360</p></div>
-                    </div>
-                    <div class="mt-2 text-xs text-gray-500">Confidence: <span id="signalConfidence">85</span>%</div>
-                </div>
-            </div>
-            
-            <!-- Order Form -->
-            <div class="bg-gray-800 rounded-2xl p-4">
-                <h3 class="text-white text-sm font-semibold mb-3">Place Order</h3>
-                <form id="orderForm">
-                    <div class="flex space-x-2 mb-3">
-                        <button type="button" onclick="setOrderType('BUY')" id="buyTypeBtn" class="flex-1 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white">BUY</button>
-                        <button type="button" onclick="setOrderType('SELL')" id="sellTypeBtn" class="flex-1 py-2 rounded-lg text-sm font-semibold bg-gray-700 text-gray-400">SELL</button>
-                    </div>
-                    <input type="hidden" id="orderType" value="BUY">
-                    <input type="number" id="entryPrice" placeholder="Entry Price" class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm mb-2" value="4540.7">
-                    <input type="number" id="stopLoss" placeholder="Stop Loss" class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm mb-2" value="4535.0">
-                    <input type="number" id="takeProfit" placeholder="Take Profit" class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm mb-2" value="4550.0">
-                    <input type="number" id="quantity" placeholder="Quantity" class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm mb-3" value="1">
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-semibold transition">
-                        PLACE ORDER
-                    </button>
-                </form>
-            </div>
-            
-            <!-- Quick Stats -->
-            <div class="bg-gray-800 rounded-2xl p-4 mt-4">
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <div><p class="text-gray-500">24h High</p><p class="text-white">4,549.0</p></div>
-                    <div><p class="text-gray-500">24h Low</p><p class="text-white">4,535.0</p></div>
-                    <div><p class="text-gray-500">Volume</p><p class="text-white">1.2M</p></div>
-                    <div><p class="text-gray-500">Open Interest</p><p class="text-white">85.3K</p></div>
-                </div>
-            </div>
+    <!-- Login Modal -->
+    <div id="loginModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
+        <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full">
+            <h2 class="text-white text-2xl mb-6">Login</h2>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3">
+                <input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-4">
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg">Login</button>
+            </form>
+            <p class="text-gray-400 text-center mt-4">New? <button onclick="showSignup()" class="text-blue-500">Sign Up</button></p>
         </div>
     </div>
-</div>
+    
+    <div id="signupModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
+        <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full">
+            <h2 class="text-white text-2xl mb-6">Sign Up</h2>
+            <form id="signupForm">
+                <input type="text" id="signupName" placeholder="Name" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3">
+                <input type="email" id="signupEmail" placeholder="Email" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-3">
+                <input type="password" id="signupPassword" placeholder="Password" class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-4">
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg">Create Account</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let mainChart = null;
+        let chartData = [];
+        let activeIndicators = [];
+        let currentPrice = 4540.7;
+        let currentTimeframe = '15m';
+        
+        // Page Navigation
+        function showPage(page) {
+            document.getElementById('dashboardPage').classList.add('hidden');
+            document.getElementById('tradingPage').classList.add('hidden');
+            document.getElementById('portfolioPage').classList.add('hidden');
+            document.getElementById('historyPage').classList.add('hidden');
+            document.getElementById(page + 'Page').classList.remove('hidden');
+            if(page === 'trading') initTradingChart();
+            updatePortfolio();
+            updateHistory();
+        }
+        
+        // Chart Functions
+        function initTradingChart() {
+            const ctx = document.getElementById('tradingChart').getContext('2d');
+            chartData = generateMockData(100);
+            mainChart = new Chart(ctx, {
+                type: 'candlestick',
+                data: { datasets: [{ label: 'Price', data: chartData, borderColor: '#3b82f6' }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+        
+        function generateMockData(count) {
+            let data = [], price = 4540;
+            for (let i = 0; i < count; i++) {
+                let open = price, close = price + (Math.random() - 0.5) * 20;
+                data.push({ x: new Date(Date.now() - (count - i) * 60000), o: open, h: Math.max(open, close) + Math.random() * 10, l: Math.min(open, close) - Math.random() * 10, c: close });
+                price = close;
+            }
+            return data;
+        }
+        
+        function updateChart(newPrice) {
+            if (!mainChart) return;
+            let lastCandle = chartData[chartData.length - 1];
+            if (lastCandle && new Date() - lastCandle.x < 60000) {
+                lastCandle.c = newPrice;
+                lastCandle.h = Math.max(lastCandle.h, newPrice);
+                lastCandle.l = Math.min(lastCandle.l, newPrice);
+            } else {
+                chartData.push({ x: new Date(), o: lastCandle?.c || newPrice, h: newPrice, l: newPrice, c: newPrice });
+                if (chartData.length > 100) chartData.shift();
+            }
+            mainChart.update();
+        }
+        
+        function setTimeframe(timeframe) {
+            currentTimeframe = timeframe;
+            document.getElementById('timeframeDisplay').innerText = timeframe;
+            let points = timeframe === '1d' ? 30 : timeframe === '1h' ? 50 : 100;
+            chartData = generateMockData(points);
+            if (mainChart) {
+                mainChart.data.datasets[0].data = chartData;
+                mainChart.update();
+            }
+            document.querySelectorAll('.timeframe-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('text-gray-400');
+            });
+            if(event && event.target) event.target.classList.add('bg-blue-600', 'text-white');
+        }
+        
+        function addIndicator(type) {
+            if (!activeIndicators.includes(type)) {
+                activeIndicators.push(type);
+                showToast(type + ' indicator added', 'success');
+            }
+            updateIndicatorPanel();
+        }
+        
+        function updateIndicatorPanel() {
+            let panel = document.getElementById('indicatorPanel');
+            if (!panel) return;
+            panel.innerHTML = '';
+            if (activeIndicators.includes('MA')) panel.innerHTML += '<div class="bg-gray-700 p-2 rounded"><p class="text-blue-500">MA(20)</p><p class="text-white">4542.50</p></div>';
+            if (activeIndicators.includes('RSI')) panel.innerHTML += '<div class="bg-gray-700 p-2 rounded"><p class="text-green-500">RSI(14)</p><p class="text-white">52.3</p></div>';
+            if (activeIndicators.includes('MACD')) panel.innerHTML += '<div class="bg-gray-700 p-2 rounded"><p class="text-purple-500">MACD</p><p class="text-white">+2.45</p></div>';
+        }
+        
+        function setOrderType(type) {
+            document.getElementById('orderType').value = type;
+            let buyBtn = document.getElementById('buyTypeBtn');
+            let sellBtn = document.getElementById('sellTypeBtn');
+            if (type === 'BUY') {
+                if(buyBtn) buyBtn.className = "flex-1 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white";
+                if(sellBtn) sellBtn.className = "flex-1 py-2 rounded-lg text-sm font-semibold bg-gray-700 text-gray-400";
+            } else {
+                if(sellBtn) sellBtn.className = "flex-1 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white";
+                if(buyBtn) buyBtn.className = "flex-1 py-2 rounded-lg text-sm font-semibold bg-gray-700 text-gray-400";
+            }
+        }
+        
+        function quickBuy() {
+            setOrderType('BUY');
+            document.getElementById('entryPrice').value = currentPrice.toFixed(1);
+            showToast('Quick Buy - Fill order details', 'info');
+        }
+        
+        function quickSell() {
+            setOrderType('SELL');
+            document.getElementById('entryPrice').value = currentPrice.toFixed(1);
+            showToast('Quick Sell - Fill order details', 'info');
+        }
+        
+        // Real-time price updates
+        function startRealTimeUpdates() {
+            setInterval(() => {
+                let change = (Math.random() - 0.5) * 3;
+                currentPrice += change;
+                let bid = currentPrice - 0.5;
+                let ask = currentPrice + 0.5;
+                let bidEl = document.getElementById('bidPrice');
+                let askEl = document.getElementById('askPrice');
+                if(bidEl) bidEl.innerText = bid.toFixed(1);
+                if(askEl) askEl.innerText = ask.toFixed(1);
+                let changePercent = (change / currentPrice * 100).toFixed(2);
+                let changeEl = document.getElementById('changePercent');
+                if(changeEl) {
+                    changeEl.className = `text-lg font-semibold ${change >= 0 ? 'text-green-500' : 'text-red-500'}`;
+                    changeEl.innerText = (change >= 0 ? '+' : '') + changePercent + '%';
+                }
+                updateChart(currentPrice);
+                
+                // Update live signal randomly
+                if (Math.random() > 0.7) {
+                    let type = Math.random() > 0.5 ? 'BUY' : 'SELL';
+                    document.getElementById('signalType').innerHTML = type;
+                    document.getElementById('signalType').className = `text-3xl font-bold ${type === 'BUY' ? 'text-green-500' : 'text-red-500'}`;
+                    document.getElementById('signalEntry').innerText = currentPrice.toFixed(1);
+                    document.getElementById('signalSL').innerText = (currentPrice - 5).toFixed(1);
+                    document.getElementById('signalTP').innerText = (currentPrice + 10).toFixed(1);
+                    document.getElementById('signalConfidence').innerText = Math.floor(Math.random() * 30 + 70);
+                }
+            }, 3000);
+        }
+        
+        // Order Management
+        document.getElementById('orderForm')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!currentUser) { showToast('Please login first', 'error'); showLogin(); return; }
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            orders.push({
+                type: document.getElementById('orderType').value,
+                entry: document.getElementById('entryPrice').value,
+                sl: document.getElementById('stopLoss').value,
+                tp: document.getElementById('takeProfit').value,
+                qty: document.getElementById('quantity').value,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('orders', JSON.stringify(orders));
+            updatePortfolio();
+            updateHistory();
+            updateDashboard();
+            showToast('Order placed!', 'success');
+            e.target.reset();
+        });
+        
+        function updatePortfolio() {
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]').filter(o => !o.exitTime);
+            let tbody = document.getElementById('portfolioTable');
+            if(tbody) {
+                tbody.innerHTML = '';
+                orders.forEach(o => {
+                    tbody.innerHTML += `<tr><td class="py-2">BTCUSD</td><td class="${o.type==='BUY'?'text-green-500':'text-red-500'}">${o.type}</td><td>$${o.entry}</td><td>${o.qty}</td><td>$0</td><td><button onclick="closePosition('${o.timestamp}')" class="bg-red-600 px-2 py-1 rounded text-sm">Close</button></td></tr>`;
+                });
+            }
+            document.getElementById('openPositions').innerText = orders.length;
+        }
+        
+        function updateHistory() {
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]').filter(o => o.exitTime);
+            let tbody = document.getElementById('historyTable');
+            if(tbody) {
+                tbody.innerHTML = '';
+                orders.slice(-10).forEach(o => {
+                    tbody.innerHTML += `<tr><td class="py-2">${new Date(o.exitTime).toLocaleString()}</td><td>BTCUSD</td><td>${o.type}</td><td>$${o.entry}</td><td>$${o.exitPrice||'-'}</td><td class="${o.pnl>=0?'text-green-500':'text-red-500'}">$${o.pnl||0}</td></tr>`;
+                });
+            }
+        }
+        
+        function updateDashboard() {
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            let closed = orders.filter(o => o.exitPrice);
+            let totalPnL = closed.reduce((s,o)=> s + parseFloat(o.pnl||0), 0);
+            let winning = closed.filter(o => parseFloat(o.pnl||0) > 0).length;
+            document.getElementById('totalPnL').innerText = `$${totalPnL.toFixed(2)}`;
+            document.getElementById('winRate').innerText = closed.length ? ((winning/closed.length)*100).toFixed(1)+'%' : '0%';
+            document.getElementById('totalTrades').innerText = orders.length;
+        }
+        
+        function closePosition(timestamp) {
+            let orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            let order = orders.find(o => o.timestamp === timestamp);
+            if(order) {
+                order.exitTime = new Date();
+                order.exitPrice = parseFloat(order.entry) + (Math.random()*20-10);
+                order.pnl = ((order.type==='BUY'?order.exitPrice-order.entry:order.entry-order.exitPrice)*order.qty).toFixed(2);
+                localStorage.setItem('orders', JSON.stringify(orders));
+                updatePortfolio();
+                updateHistory();
+                updateDashboard();
+                showToast('Position closed', 'success');
+            }
+        }
+        
+        // Auth Functions
+        function showLogin() { document.getElementById('loginModal').classList.remove('hidden'); }
+        function hideLogin() { document.getElementById('loginModal').classList.add('hidden'); }
+        function showSignup() { hideLogin(); document.getElementById('signupModal').classList.remove('hidden'); }
+        function hideSignup() { document.getElementById('signupModal').classList.add('hidden'); }
+        
+        document.getElementById('loginForm')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            currentUser = { email: document.getElementById('loginEmail').value };
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            hideLogin();
+            updateAuthUI();
+            showToast('Login successful!', 'success');
+            showPage('trading');
+        });
+        
+        document.getElementById('signupForm')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            currentUser = { email: document.getElementById('signupEmail').value, name: document.getElementById('signupName').value };
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            hideSignup();
+            updateAuthUI();
+            showToast('Account created!', 'success');
+            showPage('trading');
+        });
+        
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('user');
+            updateAuthUI();
+            showToast('Logged out', 'info');
+            showPage('dashboard');
+        }
+        
+        function updateAuthUI() {
+            document.getElementById('loginBtn').classList.toggle('hidden', !!currentUser);
+            document.getElementById('logoutBtn').classList.toggle('hidden', !currentUser);
+        }
+        
+        function showToast(msg, type) {
+            let toast = document.createElement('div');
+            toast.className = `toast ${type === 'error' ? 'bg-red-600' : type === 'success' ? 'bg-green-600' : 'bg-blue-600'} text-white px-6 py-3 rounded-lg shadow-lg`;
+            toast.innerHTML = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        // Initialize
+        let savedUser = localStorage.getItem('user');
+        if (savedUser) { currentUser = JSON.parse(savedUser); updateAuthUI(); }
+        showPage('dashboard');
+        startRealTimeUpdates();
+    </script>
+</body>
+                                </html>
